@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Coleta de Dados Meteorológicos</title>
+  <meta name="description" content="Registre o nome do local e as coordenadas geográficas para a coleta de dados meteorológicos." />
+  <meta name="theme-color" content="#0b3d5c" />
+
+  <!-- Leaflet (mapa) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
+  <style>
+    :root {
+      --bg: #f2f6f9;
+      --surface: #ffffff;
+      --ink: #12263a;
+      --muted: #5b6b7b;
+      --line: #d7e1ea;
+      --primary: #0b6e99;
+      --primary-ink: #ffffff;
+      --primary-hover: #095a7d;
+      --accent: #f2a541;
+      --ok: #1f8a5b;
+      --ok-bg: #e6f5ee;
+      --err: #c0392b;
+      --err-bg: #fbeaea;
+      --radius: 14px;
+      --shadow: 0 10px 30px rgba(18, 38, 58, .08), 0 2px 6px rgba(18, 38, 58, .05);
+      --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0d1720;
+        --surface: #15222e;
+        --ink: #e6eef5;
+        --muted: #9db0c1;
+        --line: #26384a;
+        --primary: #3aa6d8;
+        --primary-ink: #06131c;
+        --primary-hover: #5bb8e3;
+        --ok-bg: #12301f;
+        --err-bg: #3a1714;
+        --shadow: 0 10px 30px rgba(0, 0, 0, .35);
+      }
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    html, body { margin: 0; }
+
+    body {
+      font-family: var(--font);
+      background:
+        radial-gradient(1200px 500px at 10% -10%, rgba(11, 110, 153, .18), transparent 60%),
+        radial-gradient(900px 400px at 110% 0%, rgba(242, 165, 65, .15), transparent 60%),
+        var(--bg);
+      color: var(--ink);
+      line-height: 1.5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      padding: 2.5rem 1.25rem 1rem;
+      text-align: center;
+    }
+
+    header .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: .4rem;
+      font-size: .8rem;
+      font-weight: 600;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      color: var(--primary);
+      background: color-mix(in srgb, var(--primary) 12%, transparent);
+      padding: .3rem .75rem;
+      border-radius: 999px;
+    }
+
+    h1 {
+      font-size: clamp(1.6rem, 4vw, 2.3rem);
+      margin: .75rem 0 .35rem;
+      letter-spacing: -.02em;
+    }
+
+    header p { color: var(--muted); margin: 0 auto; max-width: 560px; }
+
+    main {
+      flex: 1;
+      width: 100%;
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 1rem 1.25rem 3rem;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+    }
+
+    @media (max-width: 820px) {
+      .card { grid-template-columns: 1fr; }
+    }
+
+    form { padding: 1.75rem; display: flex; flex-direction: column; gap: 1.1rem; }
+
+    .field { display: flex; flex-direction: column; gap: .35rem; }
+
+    label { font-weight: 600; font-size: .95rem; }
+
+    label .req { color: var(--err); margin-left: .15rem; }
+
+    .hint { font-size: .8rem; color: var(--muted); }
+
+    input[type="text"] {
+      font: inherit;
+      color: var(--ink);
+      background: var(--bg);
+      border: 1.5px solid var(--line);
+      border-radius: 10px;
+      padding: .7rem .85rem;
+      transition: border-color .15s, box-shadow .15s;
+      width: 100%;
+    }
+
+    input[type="text"]:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 20%, transparent);
+    }
+
+    input[aria-invalid="true"] { border-color: var(--err); }
+
+    .error-msg { color: var(--err); font-size: .8rem; min-height: 1em; }
+
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: .9rem; }
+
+    @media (max-width: 420px) { .row { grid-template-columns: 1fr; } }
+
+    .btn {
+      font: inherit;
+      font-weight: 600;
+      border: none;
+      border-radius: 10px;
+      padding: .8rem 1.1rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: .5rem;
+      transition: background .15s, transform .05s, opacity .15s;
+    }
+
+    .btn:active { transform: translateY(1px); }
+    .btn:disabled { opacity: .6; cursor: not-allowed; }
+
+    .btn-primary { background: var(--primary); color: var(--primary-ink); }
+    .btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--primary);
+      border: 1.5px solid color-mix(in srgb, var(--primary) 45%, transparent);
+    }
+    .btn-ghost:hover:not(:disabled) { background: color-mix(in srgb, var(--primary) 10%, transparent); }
+
+    .actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: .25rem; }
+    .actions .btn-primary { flex: 1; min-width: 160px; }
+
+    .spinner {
+      width: 1em; height: 1em;
+      border: 2px solid currentColor;
+      border-right-color: transparent;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      display: none;
+    }
+    .loading .spinner { display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .map-wrap { position: relative; min-height: 360px; border-left: 1px solid var(--line); }
+    @media (max-width: 820px) { .map-wrap { border-left: none; border-top: 1px solid var(--line); min-height: 300px; } }
+    #map { position: absolute; inset: 0; }
+
+    .map-tip {
+      position: absolute;
+      z-index: 500;
+      left: 50%;
+      bottom: 14px;
+      transform: translateX(-50%);
+      background: rgba(18, 38, 58, .85);
+      color: #fff;
+      font-size: .8rem;
+      padding: .4rem .8rem;
+      border-radius: 999px;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    .alert {
+      border-radius: 10px;
+      padding: .8rem 1rem;
+      font-size: .9rem;
+      display: none;
+    }
+    .alert.show { display: block; }
+    .alert.ok { background: var(--ok-bg); color: var(--ok); }
+    .alert.err { background: var(--err-bg); color: var(--err); }
+
+    footer { text-align: center; color: var(--muted); font-size: .8rem; padding: 1.5rem; }
+
+    .sr-only {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <span class="badge">🌦️ Estação de coleta</span>
+    <h1>Coleta de Dados Meteorológicos</h1>
+    <p>Informe o nome do local e as coordenadas. Use sua localização atual ou clique no mapa para preencher automaticamente.</p>
+  </header>
+
+  <main>
+    <section class="card">
+      <form id="coletaForm" novalidate>
+        <div class="field">
+          <label for="local">Nome do local<span class="req" aria-hidden="true">*</span></label>
+          <input type="text" id="local" name="local" autocomplete="off" placeholder="Ex.: Estação Centro" required />
+          <span class="error-msg" id="local-err" role="alert"></span>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label for="latitude">Latitude<span class="req" aria-hidden="true">*</span></label>
+            <input type="text" id="latitude" name="latitude" inputmode="decimal" placeholder="-20.123456" required />
+            <span class="hint">Entre -90 e 90</span>
+            <span class="error-msg" id="latitude-err" role="alert"></span>
+          </div>
+          <div class="field">
+            <label for="longitude">Longitude<span class="req" aria-hidden="true">*</span></label>
+            <input type="text" id="longitude" name="longitude" inputmode="decimal" placeholder="-49.123456" required />
+            <span class="hint">Entre -180 e 180</span>
+            <span class="error-msg" id="longitude-err" role="alert"></span>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button type="button" class="btn btn-ghost" id="btnGeo">
+            <span class="spinner" aria-hidden="true"></span>
+            📍 Usar minha localização
+          </button>
+          <button type="submit" class="btn btn-primary" id="btnSubmit">
+            <span class="spinner" aria-hidden="true"></span>
+            Enviar dados
+          </button>
+        </div>
+
+        <div class="alert" id="alert" role="status" aria-live="polite"></div>
+      </form>
+
+      <div class="map-wrap">
+        <div id="map" role="application" aria-label="Mapa para selecionar coordenadas"></div>
+        <span class="map-tip">Clique no mapa para definir o ponto</span>
+      </div>
+    </section>
+  </main>
+
+  <footer>As respostas são registradas no Google Forms.</footer>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <script>
+    (() => {
+      'use strict';
+
+      // ===== Configuração do Google Forms =====
+      const FORM_ACTION =
+        'https://docs.google.com/forms/d/e/1FAIpQLSfbsNHgjRSBk8abB0_nKPaDbskUWAGQZH1O1tg5ft34n5ZOBQ/formResponse';
+
+      const ENTRIES = {
+        local:     'entry.262602777',
+        latitude:  'entry.478174788',
+        longitude: 'entry.477064414'
+      };
+
+      const DECIMALS = 6;
+      const DEFAULT_VIEW = { lat: -14.235, lng: -51.925, zoom: 4 }; // Brasil
+
+      // ===== Elementos =====
+      const $ = (id) => document.getElementById(id);
+      const form   = $('coletaForm');
+      const inLocal = $('local');
+      const inLat  = $('latitude');
+      const inLng  = $('longitude');
+      const btnGeo = $('btnGeo');
+      const btnSubmit = $('btnSubmit');
+      const alertBox = $('alert');
+
+      // ===== Utilidades =====
+      const parseCoord = (v) => {
+        const n = parseFloat(String(v).trim().replace(',', '.'));
+        return Number.isFinite(n) ? n : NaN;
+      };
+
+      const setLoading = (btn, on) => {
+        btn.disabled = on;
+        btn.classList.toggle('loading', on);
+      };
+
+      const showAlert = (msg, type) => {
+        alertBox.textContent = msg;
+        alertBox.className = `alert show ${type}`;
+      };
+
+      const hideAlert = () => { alertBox.className = 'alert'; };
+
+      const setError = (input, msg) => {
+        const err = $(`${input.id}-err`);
+        input.setAttribute('aria-invalid', msg ? 'true' : 'false');
+        err.textContent = msg || '';
+      };
+
+      // ===== Validação =====
+      const validate = () => {
+        let ok = true;
+
+        if (!inLocal.value.trim()) {
+          setError(inLocal, 'Informe o nome do local.'); ok = false;
+        } else setError(inLocal, '');
+
+        const lat = parseCoord(inLat.value);
+        if (Number.isNaN(lat) || lat < -90 || lat > 90) {
+          setError(inLat, 'Latitude inválida.'); ok = false;
+        } else setError(inLat, '');
+
+        const lng = parseCoord(inLng.value);
+        if (Number.isNaN(lng) || lng < -180 || lng > 180) {
+          setError(inLng, 'Longitude inválida.'); ok = false;
+        } else setError(inLng, '');
+
+        return ok;
+      };
+
+      [inLocal, inLat, inLng].forEach((el) =>
+        el.addEventListener('input', () => {
+          if (el.getAttribute('aria-invalid') === 'true') setError(el, '');
+          hideAlert();
+        })
+      );
+
+      // ===== Mapa =====
+      let map = null;
+      let marker = null;
+
+      const initMap = () => {
+        if (typeof L === 'undefined') return; // CDN indisponível: página continua funcionando sem mapa
+        map = L.map('map').setView([DEFAULT_VIEW.lat, DEFAULT_VIEW.lng], DEFAULT_VIEW.zoom);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '&copy; OpenStreetMap'
+        }).addTo(map);
+
+        map.on('click', (e) => setCoords(e.latlng.lat, e.latlng.lng, false));
+      };
+
+      const placeMarker = (lat, lng, zoom) => {
+        if (!map) return;
+        if (!marker) {
+          marker = L.marker([lat, lng], { draggable: true }).addTo(map);
+          marker.on('dragend', () => {
+            const p = marker.getLatLng();
+            setCoords(p.lat, p.lng, false);
+          });
+        } else {
+          marker.setLatLng([lat, lng]);
+        }
+        if (zoom) map.setView([lat, lng], Math.max(map.getZoom(), 15));
+      };
+
+      const setCoords = (lat, lng, zoom = true) => {
+        inLat.value = lat.toFixed(DECIMALS);
+        inLng.value = lng.toFixed(DECIMALS);
+        setError(inLat, ''); setError(inLng, '');
+        placeMarker(lat, lng, zoom);
+      };
+
+      // Digitação manual atualiza o marcador
+      const syncFromInputs = () => {
+        const lat = parseCoord(inLat.value);
+        const lng = parseCoord(inLng.value);
+        if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) placeMarker(lat, lng, true);
+      };
+      inLat.addEventListener('change', syncFromInputs);
+      inLng.addEventListener('change', syncFromInputs);
+
+      // ===== Geolocalização =====
+      btnGeo.addEventListener('click', () => {
+        hideAlert();
+        if (!('geolocation' in navigator)) {
+          showAlert('Seu navegador não suporta geolocalização.', 'err');
+          return;
+        }
+        setLoading(btnGeo, true);
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            setLoading(btnGeo, false);
+            setCoords(pos.coords.latitude, pos.coords.longitude);
+            showAlert(`Localização obtida (precisão de ~${Math.round(pos.coords.accuracy)} m).`, 'ok');
+          },
+          (err) => {
+            setLoading(btnGeo, false);
+            const msgs = {
+              1: 'Permissão de localização negada. Libere o acesso no navegador ou clique no mapa.',
+              2: 'Não foi possível determinar sua localização.',
+              3: 'Tempo esgotado ao obter a localização. Tente novamente.'
+            };
+            showAlert(msgs[err.code] || 'Erro ao obter localização.', 'err');
+          },
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+        );
+      });
+
+      // ===== Envio =====
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        hideAlert();
+        if (!validate()) {
+          form.querySelector('[aria-invalid="true"]')?.focus();
+          return;
+        }
+
+        const body = new URLSearchParams();
+        body.append(ENTRIES.local, inLocal.value.trim());
+        body.append(ENTRIES.latitude, parseCoord(inLat.value).toFixed(DECIMALS));
+        body.append(ENTRIES.longitude, parseCoord(inLng.value).toFixed(DECIMALS));
+
+        setLoading(btnSubmit, true);
+        try {
+          // O Google Forms não envia cabeçalhos CORS; com no-cors a resposta é opaca,
+          // mas o registro é gravado normalmente.
+          await fetch(FORM_ACTION, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body
+          });
+          showAlert('✅ Dados enviados com sucesso! Obrigado.', 'ok');
+          form.reset();
+          if (marker) { map.removeLayer(marker); marker = null; }
+        } catch (err) {
+          showAlert('Falha de conexão ao enviar. Verifique sua internet e tente novamente.', 'err');
+        } finally {
+          setLoading(btnSubmit, false);
+        }
+      });
+
+      // ===== Pré-preenchimento via URL (?local=&lat=&lng=) =====
+      const applyQueryParams = () => {
+        const q = new URLSearchParams(location.search);
+        if (q.get('local')) inLocal.value = q.get('local');
+        const lat = parseCoord(q.get('lat') ?? q.get('latitude') ?? '');
+        const lng = parseCoord(q.get('lng') ?? q.get('longitude') ?? '');
+        if (!Number.isNaN(lat) && !Number.isNaN(lng)) setCoords(lat, lng);
+      };
+
+      initMap();
+      applyQueryParams();
+    })();
+  </script>
+</body>
+</html>
